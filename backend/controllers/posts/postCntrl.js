@@ -1,73 +1,92 @@
 const Post = require("../../models/post/Post");
+const User = require("../../models/user/User");
+const appErr = require("../../utils/appErr");
+const { decryptToken } = require("../../utils/generateToken");
+const handleValidationErrDB = require("../../utils/validationError");
+const { ObjectId } = require('mongodb');
 
-// fetching all Posts
-const getPostCntrl = async (req, res) => {
+// create new Post controller
+const createPostCntrl=async(req, res,next) => {
     try {
-        const posts = await Post.find({});
-        res.send({ message: "Fetched By Id Successfully", posts })
+        // const token = req.headers.authorization.split(" ")[1];
+        // const decryptUser = decryptToken (token);
+        const id = "65fa7f20ff97d2b9a095e674";
+        console.log(id)
+        const{title,content,category} = req.body;
+        const newPost = await Post.create({title,content,category,coverImage:req.file.path,user:id});
+        await User.findByIdAndUpdate(id, { $push: { posts: newPost._id } })
+        res.send({message:"Post Created Successfully",newPost})
     }
     catch (err) {
-        res.send(err);
+        res.send(next(handleValidationErrDB(err)));
+    }
+}
+
+
+// fetching all Posts
+const fetchPostsCntrl = async (req, res,next) => {
+    try {
+        const posts = await Post.find().sort({ createdAt: -1 }).populate("user");
+         res.send({ message: "Fetched All Posts Successfully", posts })
+    }
+    catch (err) {
+        res.send(next(appErr(err.message)));
     }
 }
 
 // fetching Post by id
-const getPostByidCntrl = async (req, res) => {
+const fetchSinglePostCntrl = async (req, res, next) => {
     try {
-        const id = req.params.id();
-        console.log(id)
-        const singlePost = await Post.findById(id);
-        res.send({ message: "Fetched By Id Successfully", singlePost })
+        console.log(req.params.id)
+        const id = req.params.id;
+        const post = await Post.findById(id).populate("user").populate({ path: "comments" });
+        res.send({ message: "Post Fetched Successfully", post })
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
     }
 }
-
-// create new Post controller
-const createPostCntrl=async(req, res) => {
-    try {
-        console.log(req.body)
-
-        const{title,description,category,coverImage} = req.body;
-        const newPost = await new Post({title,description,category,coverImage});
-        console.log(newPost)
-        newPost.save();
-        res.send({message:"Created Successfully",newPost})
-    }
-    catch (err) {
-        console.log(err)
-
-        res.send(err);
-    }
-}
-
-
 
 // update Post controller
-const updatePostCntrl=async(req, res) => {
+const updatePostCntrl=async(req, res,next) => {
     try {
-        const id = req.params.id;
-        const updatePost = await Post.findByIdAndUpdate(id,req.body);
-        res.send({message:"Updated Successfully"})
+        const token = req.headers.authorization.split(" ")[1];
+        const decryptUser = decryptToken(token);
+        const { title, content, category } = req.body;
+        const coverImage = req.body.file ? req.body.file : req.file.path;
+        const findPost = await Post.findById(req.params.id);
+        if (decryptUser.id == findPost.user) {
+                console.log(decryptUser.id , findPost.user)
+                await Post.findByIdAndUpdate(req.params.id, { title, content, category,coverImage });
+                res.send({ message: "Post Updated Successfully" })
+            }
+            else
+                return (next(appErr("You are not allowed to update this post",403)))       
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
     }
 }
 
 // delete Post controller
-const deletePostCntrl=async(req, res) => {
+const deletePostCntrl=async(req, res,next) => {
     try {
-        const id = req.params.id;
-        await Post.findByIdAndDelete(id);
-        res.send({message:"Deleted Successfully"})
+        // const token = req.headers.authorization.split(" ")[1];
+        // const decryptUser = decryptToken (token);
+        const findPost = await Post.findByIdAndDelete(req.params.id);
+        // if(decryptUser.id==findPost.user)
+        // {
+        // await Post.findByIdAndDelete(id);
+        res.send({message:"Post Deleted Successfully"})
+        // }
+        // else
+        //     return(next(appErr("You are not allowed to delete this post" ,403)))
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
     }
 }
 
 module.exports = {
-    getPostCntrl,getPostByidCntrl,createPostCntrl, updatePostCntrl, deletePostCntrl
+    fetchPostsCntrl,fetchSinglePostCntrl,createPostCntrl, updatePostCntrl, deletePostCntrl
 }

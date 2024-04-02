@@ -7,8 +7,8 @@ const UserSchema = new Schema({
     email: { type: String, required: true },
     profileImage: { type: String },
     coverImage: { type: String},
-    posts: [{ type: mongoose.Schema.Types.ObjectId,  ref: "Post" }],
-    comments:[{type:mongoose.Schema.Types.ObjectId,ref:"Comment"}]
+    posts: { type: mongoose.Schema.Types.ObjectId,  ref: "post" },
+    comments:{type:mongoose.Schema.Types.ObjectId, ref:"comment"}
 },
     { timestamps: true }
 )

@@ -1,25 +1,45 @@
 const express=require('express');
 const userRoute = express.Router();
-const {registerUserCntrl, loginCntrl, updateUserCntrl, deleteUserCntrl, getUserCntrl, getUserByidCntrl } = require('../../controllers/users/userCntrl');
+const protected=require("../../middlewares/protected")
+const {registerUserCntrl, loginCntrl, updateUserCntrl, deleteUserCntrl, fetchUserCntrl, fetchUserByidCntrl, profileCntrl, updatePasswordCntrl, uploadProfileImageCntrl, uploadCoverImageCntrl } = require('../../controllers/users/userCntrl');
+const multer = require('multer');
+const storage=require("../../config/cloudinary")
 
-
+const upload = multer({storage});
 // Fetching all Users
-userRoute.get('/', getUserCntrl);
+userRoute.get('/', fetchUserCntrl);
+
+// upload profile image 
+userRoute.put('/profile-image-upload',
+    protected,
+    upload.single('file'),
+    uploadProfileImageCntrl);
+
+// upload profile image 
+userRoute.put('/cover-image-upload',
+    protected,
+    upload.single('file'),
+    uploadCoverImageCntrl);
 
 // Fetch user by id
-userRoute.get('/:id',getUserByidCntrl );
+userRoute.get('/profile',protected,profileCntrl );
+
 
 // egister new user 
-userRoute.post('/register',registerUserCntrl );
+userRoute.post('/signup',registerUserCntrl );
 
 
 // user login
 userRoute.post('/login',loginCntrl);
 
+// Update user password by id
+userRoute.patch('/update-password/:id', updatePasswordCntrl);
 
-// Update user by id
+// Fetch user by id
+userRoute.get('/:id',fetchUserByidCntrl );
+
+// Update user details by id
 userRoute.patch('/:id', updateUserCntrl);
-
 
 // Delete users by id
 userRoute.delete('/:id', deleteUserCntrl);

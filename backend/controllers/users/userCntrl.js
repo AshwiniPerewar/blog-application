@@ -1,101 +1,176 @@
 const User = require("../../models/user/User");
-const bcrypt=require("bcrypt")
+const bcrypt=require("bcrypt");
+const appErr = require("../../utils/appErr");
+const { generateToken, decryptToken } = require("../../utils/generateToken");
+const handleValidationErrDB = require("../../utils/validationError");
+
+
 // fetching all users
-const getUserCntrl = async (req, res) => {
+const fetchUserCntrl = async (req, res,next) => {
     try {
+        console.log(req.params.id)
         const user = await User.find({});
-        res.send({ message: "User Fetched Successfully", user })
+        res.send({status:"success", message: "User Fetched Successfully", user })
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
     }
 }
 
 // fetching user by id
-const getUserByidCntrl = async (req, res) => {
+const fetchUserByidCntrl = async (req, res,next) => {
     try {
-        const id = req.params.id();
-        console.log(id)
+        const id = req.params.id;
         const user = await User.findById(id);
         res.send({ message: "User Fetched By Id Successfully", user })
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
     }
 }
 
 // register new user controller
-const registerUserCntrl=async(req, res) => {
+const registerUserCntrl=async(req, res, next) => {
     try {
         const { fullname, email, password } = req.body;
-        const existingUser = await User.findOne({ email });
-        if (existingUser)
-            res.send({ message: "User already exists" });
-        else {
-            const hash =await bcrypt.hash(password, 5);
-            console.log(hash)
-            const user = new User({ fullname, email, password:hash  });
-            await user.save();
-            res.send({ message: "User registerd Successfully", user })
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return next(appErr("User already exists"));
+            }
+            else {
+                const hash = await bcrypt.hash(password, 5);
+                const user = new User({ fullname, email, password: hash });
+                await user.save();
+                res.status(200).send({ message: "User registerd Successfully", user })
+            }
         }
-    }
     catch (err) {
-        res.send({ message: "User Registration failed", err });
+        res.send(next(handleValidationErrDB(err)));
     }
 }
 
 
 // user login
-const loginCntrl= async(req, res) => {
+const loginCntrl= async(req, res,next) => {
     try {
-        console.log(req.body)
-
-        const{email,password} = req.body;
-        const user = await User.findOne({ email  });
-        if (user)
+        const { email, password } = req.body;
+        if (!email || !password)
+            return next(appErr("Email & password fields are required"))
+        const userFound = await User.findOne({ email  });
+        if (userFound)
         {
-            const match=bcrypt.compare(password,user.password)
+            const match = await bcrypt.compare(password, userFound.password);
+            console.log(match)
             if (match)
-                res.send({ message: "Logged In Successfully" });
+            {
+                const { id, fullname, email } = userFound;
+                console.log(id);
+                const token=generateToken(id, fullname, email);
+                res.json({ message: "Logged In Successfully" ,data:userFound,token});
+            }
             else
-            res.send({ message: "Invalid Login Credentials" });
+            res.json(next(appErr("Invalid Login Credentials",400 )));
                 
         }
         else
-        res.send({ message: "Invalid Login Credentials" });
+        res.json(next(appErr("Invalid Login Credentials",400 )));
     }
     catch (err) {
-        console.log(err)
+        res.json(next(appErr(err.message)));
+    }
+}
 
-        res.send(err);
+
+// fetching profile by id
+const profileCntrl = async (req, res,next) => {
+    try {
+       const token = req.headers.authorization.split(" ")[1];
+            const user = decryptToken(token);
+        const userFound = await User.findById(user.id).populate("posts");
+        console.log(userFound)
+            res.send({ message: "User Profile Fetched Successfully", data: userFound })
+        }
+    catch (err) {
+        res.send(next(appErr(err.message)));
     }
 }
 
 
 // update user controller
-const updateUserCntrl=async(req, res) => {
+const updateUserCntrl=async(req, res,next) => {
     try {
         const id = req.params.id;
-        const user = await User.findByIdAndUpdate(id,req.body);
-        res.send({message:"Updated Successfully"})
+        const { fullname, email,age } = req.body;
+        const user = await User.findByIdAndUpdate(id,{fullname,email,age});
+        res.send({message:"User Details Updated Successfully"})
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
+    }
+}
+
+// update password controller
+const updatePasswordCntrl=async(req, res,next) => {
+    try {
+        const id = req.params.id;
+        const { password, newpassword } = req.body;
+        const user = await User.findById(id);
+        const match=bcrypt.compare(password,user.password)
+        if (!match)
+            return next(appErr({ message: "Incorrect password" }))
+        else {
+            const hash =await bcrypt.hash(newpassword, 5);
+            await User.findByIdAndUpdate(id,{password:hash})
+            res.send({ message: "Password has Changed Successfully" })
+        }
+    }
+    catch (err) {
+        res.send(next(appErr(err.message)));
+    }
+}
+
+// update profile Image controller
+const uploadProfileImageCntrl=async(req, res,next) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        const user = decryptToken(token);
+        const path=req.file.path;
+        const userFound = await User.findByIdAndUpdate(user.id,{profileImage:path});
+        res.send({ message: "Profile Image Uploaded Successfully" })
+        
+    }
+    catch (err) {
+        res.send(next(appErr(err.message)));
+    }
+}
+
+// update cover Image controller
+const uploadCoverImageCntrl=async(req, res,next) => {
+    try {
+        const token = req.headers.authorization.split(" ")[1];
+        const user = decryptToken(token);
+        const path=req.file.path;
+        const userFound = await User.findByIdAndUpdate(user.id,{coverImage:path});
+        res.send({ message: "Cover Image Uploaded Successfully" })
+        
+    }
+    catch (err) {
+        res.send(next(appErr(err.message)));
     }
 }
 
 // delete user controller
-const deleteUserCntrl=async(req, res) => {
+const deleteUserCntrl = async (req, res, next) => {
     try {
         const id = req.params.id;
         await User.findByIdAndDelete(id);
-        res.send({message:"Deleted Successfully"})
+        res.send({ message: "Deleted Successfully" })
     }
     catch (err) {
-        res.send(err);
+        res.send(next(appErr(err.message)));
     }
 }
 
 module.exports = {
-    getUserCntrl,getUserByidCntrl,registerUserCntrl, loginCntrl, updateUserCntrl, deleteUserCntrl
+    fetchUserCntrl,fetchUserByidCntrl,registerUserCntrl,profileCntrl, uploadProfileImageCntrl, uploadCoverImageCntrl, loginCntrl, updateUserCntrl,updatePasswordCntrl, deleteUserCntrl
 }
