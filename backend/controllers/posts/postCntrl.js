@@ -8,9 +8,9 @@ const { ObjectId } = require('mongodb');
 // create new Post controller
 const createPostCntrl=async(req, res,next) => {
     try {
-        // const token = req.headers.authorization.split(" ")[1];
-        // const decryptUser = decryptToken (token);
-        const id = "65fa7f20ff97d2b9a095e674";
+        const token = req.headers.authorization.split(" ")[1];
+        const decryptUser = decryptToken(token);
+        const id = decryptUser.id;
         console.log(id)
         const{title,content,category} = req.body;
         const newPost = await Post.create({title,content,category,coverImage:req.file.path,user:id});
@@ -24,10 +24,14 @@ const createPostCntrl=async(req, res,next) => {
 
 
 // fetching all Posts
-const fetchPostsCntrl = async (req, res,next) => {
-    try {
-        const posts = await Post.find().sort({ createdAt: -1 }).populate("user");
-         res.send({ message: "Fetched All Posts Successfully", posts })
+const fetchPostsCntrl = async (req, res, next) => {
+    let { sortBy, category } = req.query;
+    console.log(category)
+    // const sortBy = req.query;
+    console.log(sortBy)
+     try {
+         const posts = await Post.find(category ? {category}:{}).sort(sortBy).limit(10).populate("user");
+        res.send({ message: "Fetched All Posts Successfully", posts })
     }
     catch (err) {
         res.send(next(appErr(err.message)));

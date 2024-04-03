@@ -20,10 +20,11 @@ import {
 import { api } from '../../api';
 
 // Post actions
-export const fetchPosts = () => async dispatch => {
+export const fetchPosts = (sortBy,category) => async dispatch => {
+  console.log(sortBy,category)
   dispatch({ type: FETCH_POSTS_REQUEST });
   try {
-    const res = await axios.get(`${api}/posts`);
+    let res = await axios.get(sortBy?`${api}/posts?category=${category}&sortBy=${sortBy}`:`${api}/posts`);
     dispatch({
       type: FETCH_POSTS_SUCCESS,
       payload: res.data.posts

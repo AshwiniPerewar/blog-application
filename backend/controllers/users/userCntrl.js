@@ -8,8 +8,9 @@ const handleValidationErrDB = require("../../utils/validationError");
 // fetching all users
 const fetchUserCntrl = async (req, res,next) => {
     try {
-        console.log(req.params.id)
-        const user = await User.find({});
+        const {email,_id} = req.query;
+        // console.log(req.params.id)
+        const user = await User.findOne({ email :email,_id:_id});
         res.send({status:"success", message: "User Fetched Successfully", user })
     }
     catch (err) {
